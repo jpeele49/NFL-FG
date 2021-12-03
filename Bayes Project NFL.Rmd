@@ -1,0 +1,81 @@
+---
+title: "Bayes Project NFL"
+author: "Jack Peele"
+date: "11/20/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+```
+
+
+```{r}
+plays <- read.csv("plays.csv")
+
+plays <- plays %>%
+  filter(specialTeamsPlayType == "Field Goal")
+
+plays$distance <- str_extract(plays$playDescription, "[0-9]+ yard field goal")
+
+plays$distance <- as.numeric(str_extract(plays$distance, "[0-9]+"))
+
+# unique(plays$specialTeamsResult)
+
+plays$result <- ifelse(plays$specialTeamsResult == "Kick Attempt Good", 1, 0)
+```
+
+```{r}
+plays<- plays %>%
+  mutate(gameClock = str_sub(gameClock, 1, -4))
+
+plays$gameClock <- ms(plays$gameClock)
+
+plays$seconds <- as.numeric(as.period(plays$gameClock, unit = "sec"))
+
+plays$seconds <- ifelse(plays$quarter == 1, plays$seconds + 15*60*3, 
+                        ifelse(plays$quarter == 2, plays$seconds + 15*60*2, 
+                               ifelse(plays$quarter == 3, plays$seconds + 15 * 60, plays$seconds)))
+
+plays$result <- as.factor(plays$result)
+plays$kickerId <- as.factor(plays$kickerId)
+```
+
+```{r}
+games <- read.csv("games.csv")
+
+plays <- left_join(plays, games, by = "gameId")
+
+plays$score_diff <- ifelse(plays$possessionTeam == plays$homeTeamAbbr, 
+                           plays$preSnapHomeScore - plays$preSnapVisitorScore, 
+                           plays$preSnapVisitorScore - plays$preSnapHomeScore)
+```
+
+```{r}
+players <- read.csv("players.csv")
+
+players$nflId <- as.factor(players$nflId)
+
+plays <- left_join(plays, players, by = c("kickerId" = "nflId"))
+```
+
+
+```{r}
+write.csv(plays, "nfl_fg.csv")
+```
+
+```{r}
+length(unique(plays$kickerId))
+```
+
+
+
+
+
+
